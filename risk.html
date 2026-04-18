@@ -437,6 +437,16 @@ header p {
   #map  { grid-template-columns: repeat(4, 1fr); }
   header h1 { font-size: 24px; letter-spacing: 4px; }
 }
+@media (max-width: 500px) {
+  #map { grid-template-columns: repeat(3, 1fr); }
+  #players-wrap { grid-template-columns: 1fr; }
+  header h1 { font-size: 20px; letter-spacing: 2px; }
+  .terr { min-height: 60px; padding: 6px 3px 4px; }
+  .btn { padding: 12px 20px; font-size: 14px; }
+  .player-card { padding: 8px 8px 6px; }
+  .pc-name { font-size: 10px; }
+  .pc-stat { font-size: 11px; }
+}
 </style>
 </head>
 <body>
