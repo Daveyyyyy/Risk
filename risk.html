@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RISK — Wereldverovering</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;800&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --red:    #c0392b; --red-l:   #f9e8e7; --red-d:   #7b241c;
+  --blue:   #2471a3; --blue-l:  #e8f4fb; --blue-d:  #154360;
+  --green:  #1e8449; --green-l: #e9f7ef; --green-d: #145a32;
+  --amber:  #b7770d; --amber-l: #fef9e7; --amber-d: #7d5a0a;
+  --bg:     #1a1209;
+  --paper:  #f5f0e8;
+  --ink:    #2c2010;
+  --gold:   #c9a84c;
+  --border: #8b6914;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Crimson Text', Georgia, serif;
+  background: var(--bg);
+  color: var(--paper);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Parchment texture overlay */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 0;
+}
+
+#app { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 16px; }
+
+/* Header */
+header {
+  text-align: center;
+  padding: 20px 0 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+header h1 {
+  font-family: 'Cinzel', serif;
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: 8px;
+  color: var(--gold);
+  text-shadow: 0 0 30px rgba(201,168,76,0.4);
+}
+header p {
+  font-style: italic;
+  color: rgba(245,240,232,0.5);
+  font-size: 14px;
+  letter-spacing: 2px;
+  margin-top: 4px;
+}
+
+/* Layout */
+#main { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+
+/* Map */
+#map-wrap {
+  background: linear-gradient(135deg, #1e1508 0%, #2a1e0a 100%);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+}
+#map-wrap::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 30% 40%, rgba(201,168,76,0.06) 0%, transparent 60%);
+  pointer-events: none;
+}
+#map {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.terr {
+  border: 1.5px solid rgba(139,105,20,0.5);
+  border-radius: 6px;
+  padding: 8px 4px 6px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform .15s, border-color .15s, box-shadow .15s;
+  position: relative;
+  min-height: 72px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.terr::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.07) 0%, transparent 50%);
+  pointer-events: none;
+}
+.terr:hover { transform: translateY(-2px) scale(1.03); border-color: var(--gold); }
+.terr.selected {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 0 2px var(--gold), 0 0 16px rgba(201,168,76,0.4);
+  transform: translateY(-2px);
+}
+.terr.can-attack {
+  border-color: var(--red) !important;
+  animation: pulse-red 1.2s ease-in-out infinite;
+}
+@keyframes pulse-red {
+  0%,100% { box-shadow: 0 0 0 0 rgba(192,57,43,0); }
+  50%      { box-shadow: 0 0 0 4px rgba(192,57,43,0.5), 0 0 12px rgba(192,57,43,0.3); }
+}
+.terr.can-fortify {
+  border-color: #27ae60 !important;
+  animation: pulse-green 1.2s ease-in-out infinite;
+}
+@keyframes pulse-green {
+  0%,100% { box-shadow: 0 0 0 0 rgba(39,174,96,0); }
+  50%      { box-shadow: 0 0 0 4px rgba(39,174,96,0.4); }
+}
+.terr-name {
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+.terr-troops {
+  font-family: 'Cinzel', serif;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  position: relative;
+}
+.terr-cont {
+  font-size: 8px;
+  margin-top: 3px;
+  opacity: 0.6;
+  font-style: italic;
+}
+
+/* Troop change animation */
+@keyframes troop-add {
+  0%   { transform: scale(1.8); color: #f1c40f; }
+  100% { transform: scale(1); }
+}
+@keyframes troop-loss {
+  0%   { transform: scale(0.5); color: #e74c3c; }
+  100% { transform: scale(1); }
+}
+.anim-add .terr-troops   { animation: troop-add  .4s cubic-bezier(.17,.67,.4,1.3) forwards; }
+.anim-loss .terr-troops  { animation: troop-loss .4s cubic-bezier(.17,.67,.4,1.3) forwards; }
+
+/* Conquer flash */
+@keyframes conquer-flash {
+  0%   { filter: brightness(3); }
+  100% { filter: brightness(1); }
+}
+.anim-conquer { animation: conquer-flash .5s ease-out forwards; }
+
+/* Sidebar */
+#sidebar { display: flex; flex-direction: column; gap: 12px; }
+
+/* Player cards */
+#players-wrap {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+.player-card {
+  border: 1px solid rgba(139,105,20,0.4);
+  border-radius: 6px;
+  padding: 10px 10px 8px;
+  position: relative;
+  transition: border-color .2s, box-shadow .2s;
+}
+.player-card.active {
+  border-color: var(--gold);
+  box-shadow: 0 0 12px rgba(201,168,76,0.25);
+}
+.player-card.eliminated { opacity: 0.35; }
+.pc-name {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+  display: flex; align-items: center; gap: 6px;
+}
+.pc-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.pc-stat { font-size: 12px; color: rgba(245,240,232,0.65); line-height: 1.6; }
+.pc-stat b { color: var(--paper); font-weight: 600; }
+.active-crown {
+  position: absolute; top: 6px; right: 8px;
+  font-size: 14px;
+  animation: float-crown 2s ease-in-out infinite;
+}
+@keyframes float-crown {
+  0%,100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+
+/* Phase panel */
+#phase-panel {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+}
+#phase-title {
+  font-family: 'Cinzel', serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gold);
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+#phase-hint {
+  font-size: 13px;
+  font-style: italic;
+  color: rgba(245,240,232,0.7);
+  line-height: 1.5;
+}
+#troops-left {
+  margin-top: 8px;
+  font-family: 'Cinzel', serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--gold);
+  text-align: center;
+}
+#troops-lbl { font-size: 11px; text-align: center; color: rgba(245,240,232,0.5); margin-top: 2px; }
+
+/* Fortify slider */
+#fortify-row {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(139,105,20,0.3);
+}
+#fortify-row label { font-size: 12px; color: rgba(245,240,232,0.65); }
+#fortify-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 4px;
+  background: rgba(201,168,76,0.3);
+  border-radius: 2px;
+  outline: none;
+}
+#fortify-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--gold);
+  cursor: pointer;
+}
+#fortify-val {
+  font-family: 'Cinzel', serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gold);
+  min-width: 24px;
+  text-align: right;
+}
+
+/* Buttons */
+#btn-row { display: flex; flex-direction: column; gap: 8px; }
+.btn {
+  font-family: 'Cinzel', serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  padding: 10px 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all .15s;
+  background: rgba(201,168,76,0.08);
+  color: var(--gold);
+}
+.btn:hover:not(:disabled) {
+  background: rgba(201,168,76,0.18);
+  box-shadow: 0 0 8px rgba(201,168,76,0.2);
+}
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn.danger { color: #e74c3c; border-color: #922b21; background: rgba(192,57,43,0.08); }
+.btn.danger:hover:not(:disabled) { background: rgba(192,57,43,0.18); }
+
+/* Dice area */
+#dice-section {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(139,105,20,0.4);
+  border-radius: 6px;
+  padding: 12px;
+  min-height: 80px;
+}
+#dice-title {
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  color: rgba(245,240,232,0.4);
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+#dice-wrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.die-group { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.die-label { font-size: 10px; color: rgba(245,240,232,0.4); letter-spacing: 1px; }
+.die-row { display: flex; gap: 5px; }
+.die {
+  width: 38px; height: 38px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Cinzel', serif;
+  font-size: 20px;
+  font-weight: 800;
+  border: 1.5px solid;
+  position: relative;
+  overflow: hidden;
+}
+.die::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%);
+}
+.die.atk { background: #7b241c; border-color: #c0392b; color: #fce4e1; }
+.die.def { background: #154360; border-color: #2471a3; color: #d6eaf8; }
+.die.win { filter: brightness(1.4); }
+.die.lose { filter: brightness(0.6); }
+
+@keyframes roll {
+  0%   { transform: rotate(0deg)   scale(1); }
+  20%  { transform: rotate(-15deg) scale(1.2); }
+  40%  { transform: rotate(15deg)  scale(0.9); }
+  60%  { transform: rotate(-10deg) scale(1.1); }
+  80%  { transform: rotate(5deg)   scale(0.95); }
+  100% { transform: rotate(0deg)   scale(1); }
+}
+.die.rolling { animation: roll .5s cubic-bezier(.17,.67,.4,1.3); }
+
+#dice-result {
+  width: 100%;
+  margin-top: 8px;
+  font-size: 13px;
+  font-style: italic;
+  color: rgba(245,240,232,0.6);
+  border-top: 1px solid rgba(139,105,20,0.3);
+  padding-top: 8px;
+}
+
+/* Log */
+#log-section {
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(139,105,20,0.3);
+  border-radius: 6px;
+  padding: 10px;
+  flex: 1;
+  max-height: 200px;
+  overflow-y: auto;
+}
+#log-section::-webkit-scrollbar { width: 4px; }
+#log-section::-webkit-scrollbar-track { background: transparent; }
+#log-section::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.3); border-radius: 2px; }
+.log-entry {
+  font-size: 12px;
+  color: rgba(245,240,232,0.6);
+  line-height: 1.6;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  padding: 2px 0;
+}
+.log-entry.important { color: var(--gold); font-style: italic; }
+.log-entry.victory   { color: #f1c40f; font-family: 'Cinzel', serif; font-size: 13px; }
+
+/* Continent legend */
+#cont-legend {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid rgba(139,105,20,0.3);
+}
+.cont-item {
+  font-size: 11px;
+  color: rgba(245,240,232,0.55);
+  display: flex; justify-content: space-between;
+  font-style: italic;
+}
+.cont-item b { color: var(--gold); font-style: normal; }
+
+/* Victory screen */
+#victory-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 100;
+  align-items: center; justify-content: center;
+  flex-direction: column;
+  gap: 20px;
+}
+#victory-overlay.show { display: flex; }
+#victory-box {
+  text-align: center;
+  border: 2px solid var(--gold);
+  padding: 48px 64px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1e1508, #2a1e0a);
+  box-shadow: 0 0 60px rgba(201,168,76,0.3);
+  animation: victory-in .6s cubic-bezier(.17,.67,.4,1.3);
+}
+@keyframes victory-in {
+  0%   { transform: scale(0.5) rotate(-5deg); opacity: 0; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+#victory-box h2 {
+  font-family: 'Cinzel', serif;
+  font-size: 48px;
+  font-weight: 800;
+  color: var(--gold);
+  text-shadow: 0 0 40px rgba(201,168,76,0.8);
+  letter-spacing: 4px;
+  margin-bottom: 8px;
+}
+#victory-box p {
+  font-size: 18px;
+  color: rgba(245,240,232,0.8);
+  font-style: italic;
+  margin-bottom: 24px;
+}
+.stars { font-size: 32px; letter-spacing: 8px; margin-bottom: 16px; }
+
+/* Responsive */
+@media (max-width: 700px) {
+  #main { grid-template-columns: 1fr; }
+  #map  { grid-template-columns: repeat(4, 1fr); }
+  header h1 { font-size: 24px; letter-spacing: 4px; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>R I S K</h1>
+    <p>Wereldverovering — Hotseat voor 4 spelers</p>
+  </header>
+
+  <div id="main">
+    <!-- Map -->
+    <div id="map-wrap">
+      <div id="map"></div>
+      <div id="cont-legend"></div>
+    </div>
+
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div id="players-wrap"></div>
+
+      <div id="phase-panel">
+        <div id="phase-title">FASE</div>
+        <div id="phase-hint"></div>
+        <div id="troops-left" style="display:none">0</div>
+        <div id="troops-lbl" style="display:none">troepen te plaatsen</div>
+        <div id="fortify-row">
+          <label>Troepen</label>
+          <input type="range" id="fortify-slider" min="1" max="1" value="1" step="1">
+          <span id="fortify-val">1</span>
+        </div>
+      </div>
+
+      <div id="btn-row">
+        <button class="btn" id="btn-auto">Automatisch plaatsen</button>
+        <button class="btn" id="btn-skip">Aanval overslaan →</button>
+        <button class="btn" id="btn-end">Beurt beëindigen →</button>
+        <button class="btn danger" id="btn-restart">Nieuw spel</button>
+      </div>
+
+      <div id="dice-section">
+        <div id="dice-title">DOBBELSTENEN</div>
+        <div id="dice-wrap"></div>
+        <div id="dice-result"></div>
+      </div>
+
+      <div id="log-section"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Victory -->
+<div id="victory-overlay">
+  <div id="victory-box">
+    <div class="stars">★ ★ ★</div>
+    <h2 id="victory-name"></h2>
+    <p>heeft de wereld veroverd!</p>
+    <button class="btn" onclick="location.reload()" style="font-size:14px;padding:12px 32px">Speel opnieuw</button>
+  </div>
+</div>
+
+<script>
+const PLAYERS = [
+  { id:0, name:"Rood",   color:"#c0392b", light:"#4a1509", dot:"#e74c3c" },
+  { id:1, name:"Blauw",  color:"#2471a3", light:"#0a2840", dot:"#3498db" },
+  { id:2, name:"Groen",  color:"#1e8449", light:"#0a2d1a", dot:"#27ae60" },
+  { id:3, name:"Goud",   color:"#b7770d", light:"#3d2800", dot:"#f0b429" },
+];
+
+const CONTINENTS = {
+  "Europa":   { bonus:5 },
+  "Azië":     { bonus:7 },
+  "Amerika":  { bonus:5 },
+  "Afrika":   { bonus:3 },
+  "Oceanië":  { bonus:2 },
+};
+
+const TERR_DATA = [
+  {id:0,  name:"Engeland",      cont:"Europa",   adj:[1,2,8]},
+  {id:1,  name:"Duitsland",     cont:"Europa",   adj:[0,2,3,9]},
+  {id:2,  name:"Frankrijk",     cont:"Europa",   adj:[0,1,3,10]},
+  {id:3,  name:"Italië",        cont:"Europa",   adj:[1,2,4,9]},
+  {id:4,  name:"Spanje",        cont:"Europa",   adj:[2,3,5]},
+  {id:5,  name:"Griekenland",   cont:"Europa",   adj:[3,4,9,11]},
+  {id:6,  name:"Japan",         cont:"Azië",     adj:[7,8,12]},
+  {id:7,  name:"China",         cont:"Azië",     adj:[6,8,9,13]},
+  {id:8,  name:"Rusland",       cont:"Azië",     adj:[0,6,7,9]},
+  {id:9,  name:"Midden-Oosten", cont:"Azië",     adj:[1,3,5,7,8,11]},
+  {id:10, name:"Noord-Afrika",  cont:"Afrika",   adj:[2,4,11,14,16]},
+  {id:11, name:"Oost-Afrika",   cont:"Afrika",   adj:[5,9,10,12,16,17]},
+  {id:12, name:"Zuid-Afrika",   cont:"Afrika",   adj:[6,7,11,13,17]},
+  {id:13, name:"Indië",         cont:"Azië",     adj:[7,12,19]},
+  {id:14, name:"Noord-Amerika", cont:"Amerika",  adj:[10,15,16]},
+  {id:15, name:"Zuid-Amerika",  cont:"Amerika",  adj:[14,16,17]},
+  {id:16, name:"West-Afrika",   cont:"Afrika",   adj:[10,11,14,15]},
+  {id:17, name:"Madagascar",    cont:"Afrika",   adj:[11,12,15]},
+  {id:18, name:"Australië",     cont:"Oceanië",  adj:[19,20]},
+  {id:19, name:"Nieuw-Zeeland", cont:"Oceanië",  adj:[13,18,20]},
+  {id:20, name:"Indonesië",     cont:"Oceanië",  adj:[13,18,19]},
+];
+
+// ── State ──────────────────────────────────────────────────────────────
+let S = {
+  territories: TERR_DATA.map(t => ({...t, owner:-1, troops:0})),
+  currentPlayer: 0,
+  phase: "place",        // place | attack | fortify
+  troopsLeft: 0,
+  selected: -1,
+  round: 1,
+  over: false,
+  attacking: false,      // lock during animation
+};
+
+// ── Helpers ────────────────────────────────────────────────────────────
+const roll = () => Math.floor(Math.random()*6)+1;
+const own  = pid => S.territories.filter(t => t.owner === pid);
+
+function getTroops(pid) {
+  let base = Math.max(3, Math.floor(own(pid).length / 3));
+  let bonus = 0;
+  for (const [cn, cd] of Object.entries(CONTINENTS)) {
+    const cnt = TERR_DATA.filter(t => t.cont === cn).length;
+    if (own(pid).filter(t => t.cont === cn).length === cnt) bonus += cd.bonus;
+  }
+  return base + bonus;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── Init ───────────────────────────────────────────────────────────────
+function initGame() {
+  let ids = [...Array(21).keys()];
+  for (let i = ids.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [ids[i],ids[j]] = [ids[j],ids[i]];
+  }
+  ids.forEach((tid,i) => {
+    S.territories[tid].owner  = i % 4;
+    S.territories[tid].troops = 2;
+  });
+  S.troopsLeft = getTroops(0);
+  log(`Spel gestart! ${PLAYERS[0].name} begint — ${S.troopsLeft} troepen te plaatsen.`);
+  render();
+  buildContLegend();
+}
+
+// ── Interaction ────────────────────────────────────────────────────────
+function clickTerr(id) {
+  if (S.over || S.attacking) return;
+  const T   = S.territories[id];
+  const cp  = S.currentPlayer;
+
+  if (S.phase === "place") {
+    if (T.owner !== cp) { log("Alleen eigen gebieden."); return; }
+    animTroop(id, "add");
+    T.troops++;
+    S.troopsLeft--;
+    log(`${PLAYERS[cp].name} plaatst troep op ${T.name} (${T.troops})`);
+    if (S.troopsLeft <= 0) { S.phase = "attack"; S.selected = -1; log(`${PLAYERS[cp].name} kan nu aanvallen.`, true); }
+    render(); return;
+  }
+
+  if (S.phase === "attack") {
+    if (S.selected === -1) {
+      if (T.owner !== cp)  { log("Selecteer een eigen gebied."); return; }
+      if (T.troops < 2)    { log("Minimaal 2 troepen nodig om aan te vallen."); return; }
+      S.selected = id; render(); return;
+    }
+    const src = S.territories[S.selected];
+    if (id === S.selected)           { S.selected = -1; render(); return; }
+    if (T.owner === cp)              { S.selected = (src.troops<2 ? -1 : id); render(); return; }
+    if (!src.adj.includes(id))       { log("Niet aangrenzend."); return; }
+    doAttack(S.selected, id);
+    return;
+  }
+
+  if (S.phase === "fortify") {
+    if (S.selected === -1) {
+      if (T.owner !== cp || T.troops < 2) return;
+      S.selected = id;
+      const sl = document.getElementById("fortify-slider");
+      sl.max = T.troops - 1; sl.value = 1;
+      document.getElementById("fortify-val").textContent = 1;
+      document.getElementById("fortify-row").style.display = "flex";
+      log(`Van ${T.name} verplaatsen. Klik aangrenzend eigen gebied.`);
+      render(); return;
+    }
+    const src = S.territories[S.selected];
+    if (T.owner !== cp || !src.adj.includes(id)) {
+      S.selected = -1;
+      document.getElementById("fortify-row").style.display = "none";
+      render(); return;
+    }
+    const n = parseInt(document.getElementById("fortify-slider").value);
+    animTroop(S.selected, "loss");
+    animTroop(id, "add");
+    src.troops -= n; T.troops += n;
+    log(`${n} troepen van ${src.name} naar ${T.name}`);
+    S.selected = -1;
+    document.getElementById("fortify-row").style.display = "none";
+    endTurn();
+  }
+}
+
+// ── Attack ─────────────────────────────────────────────────────────────
+async function doAttack(srcId, defId) {
+  S.attacking = true;
+  S.selected  = -1;
+  const src = S.territories[srcId];
+  const def = S.territories[defId];
+
+  const atkN = Math.min(3, src.troops - 1);
+  const defN = Math.min(2, def.troops);
+  let atkR = [], defR = [];
+  for (let i=0; i<atkN; i++) atkR.push(roll());
+  for (let i=0; i<defN; i++) defR.push(roll());
+  atkR.sort((a,b) => b-a);
+  defR.sort((a,b) => b-a);
+
+  showDiceRolling(atkR, defR);
+  await sleep(550);
+
+  let atkL = 0, defL = 0;
+  const pairs = Math.min(atkR.length, defR.length);
+  const atkW = [], defW = [];
+  for (let i=0; i<pairs; i++) {
+    if (atkR[i] > defR[i]) { defL++; atkW.push(i); }
+    else                   { atkL++; defW.push(i); }
+  }
+  showDiceResult(atkR, defR, atkW, defW, atkL, defL);
+
+  if (atkL > 0) animTroop(srcId, "loss");
+  if (defL > 0) animTroop(defId, "loss");
+  src.troops -= atkL;
+  def.troops -= defL;
+
+  log(`⚔ ${src.name}[${atkR}] vs ${def.name}[${defR}] — atk -${atkL}, def -${defL}`);
+
+  if (def.troops <= 0) {
+    await sleep(200);
+    const prev = def.owner;
+    def.owner  = src.owner;
+    def.troops = Math.max(1, atkN - atkL);
+    src.troops -= def.troops;
+    if (src.troops < 1) src.troops = 1;
+    animConquer(defId);
+    log(`🏳 ${PLAYERS[src.owner].name} verovert ${def.name} van ${PLAYERS[prev].name}!`, true);
+    checkElim(prev);
+    if (checkWin()) { S.attacking = false; return; }
+  }
+
+  await sleep(150);
+  S.attacking = false;
+  render();
+}
+
+function checkElim(pid) {
+  if (own(pid).length === 0) log(`☠ ${PLAYERS[pid].name} is uitgeschakeld!`, true);
+}
+
+function checkWin() {
+  for (let pid = 0; pid < 4; pid++) {
+    if (S.territories.every(t => t.owner === pid)) {
+      S.over = true;
+      document.getElementById("victory-name").textContent = PLAYERS[pid].name;
+      document.getElementById("victory-overlay").classList.add("show");
+      log(`🏆 ${PLAYERS[pid].name} wint!`, true);
+      return true;
+    }
+  }
+  return false;
+}
+
+// ── Turn ───────────────────────────────────────────────────────────────
+function endTurn() {
+  let next = (S.currentPlayer + 1) % 4;
+  let tries = 0;
+  while (own(next).length === 0 && tries++ < 4) next = (next+1) % 4;
+  if (next === 0) S.round++;
+  S.currentPlayer = next;
+  S.phase     = "place";
+  S.selected  = -1;
+  S.troopsLeft = getTroops(next);
+  document.getElementById("fortify-row").style.display = "none";
+  document.getElementById("dice-wrap").innerHTML = "";
+  document.getElementById("dice-result").textContent = "";
+  log(`— Beurt ${PLAYERS[next].name}: ${S.troopsLeft} troepen (ronde ${S.round}) —`, true);
+  render();
+}
+
+// ── Animations ─────────────────────────────────────────────────────────
+function animTroop(id, type) {
+  const el = document.querySelector(`[data-id="${id}"]`);
+  if (!el) return;
+  el.classList.remove("anim-add","anim-loss");
+  void el.offsetWidth;
+  el.classList.add(type === "add" ? "anim-add" : "anim-loss");
+  setTimeout(() => el.classList.remove("anim-add","anim-loss"), 500);
+}
+function animConquer(id) {
+  const el = document.querySelector(`[data-id="${id}"]`);
+  if (!el) return;
+  el.classList.add("anim-conquer");
+  setTimeout(() => el.classList.remove("anim-conquer"), 600);
+}
+
+// ── Dice display ────────────────────────────────────────────────────────
+function showDiceRolling(atk, def) {
+  const wrap = document.getElementById("dice-wrap");
+  wrap.innerHTML = "";
+  document.getElementById("dice-result").textContent = "";
+
+  const ag = document.createElement("div"); ag.className = "die-group";
+  ag.innerHTML = `<div class="die-label">AANVALLER</div><div class="die-row" id="atk-row"></div>`;
+  wrap.appendChild(ag);
+
+  const sep = document.createElement("div");
+  sep.style.cssText = "align-self:center;color:rgba(245,240,232,0.3);font-size:20px;padding:0 4px;margin-top:14px";
+  sep.textContent = "VS"; wrap.appendChild(sep);
+
+  const dg = document.createElement("div"); dg.className = "die-group";
+  dg.innerHTML = `<div class="die-label">VERDEDIGER</div><div class="die-row" id="def-row"></div>`;
+  wrap.appendChild(dg);
+
+  const atkRow = document.getElementById("atk-row");
+  const defRow = document.getElementById("def-row");
+
+  atk.forEach(v => {
+    const d = document.createElement("div");
+    d.className = "die atk rolling";
+    d.textContent = v;
+    atkRow.appendChild(d);
+  });
+  def.forEach(v => {
+    const d = document.createElement("div");
+    d.className = "die def rolling";
+    d.textContent = v;
+    defRow.appendChild(d);
+  });
+}
+
+function showDiceResult(atk, def, atkW, defW, atkL, defL) {
+  const atkRow = document.getElementById("atk-row");
+  const defRow = document.getElementById("def-row");
+  if (!atkRow || !defRow) return;
+  [...atkRow.children].forEach((d,i) => {
+    d.classList.remove("rolling");
+    d.classList.add(atkW.includes(i) ? "win" : (i < Math.min(atk.length,def.length) ? "lose" : ""));
+  });
+  [...defRow.children].forEach((d,i) => {
+    d.classList.remove("rolling");
+    d.classList.add(defW.includes(i) ? "win" : (i < Math.min(atk.length,def.length) ? "lose" : ""));
+  });
+  const el = document.getElementById("dice-result");
+  if (atkL === 0 && defL === 0) el.textContent = "Geen verliezen";
+  else if (atkL > 0 && defL > 0) el.textContent = `Beide verliezen ${atkL > defL ? 'meer' : 'evenveel'}`;
+  else if (atkL > 0) el.textContent = `Aanvaller verliest ${atkL} troep${atkL>1?"en":""}`;
+  else el.textContent = `Verdediger verliest ${defL} troep${defL>1?"en":""}`;
+}
+
+// ── Log ────────────────────────────────────────────────────────────────
+function log(msg, important=false) {
+  const el = document.getElementById("log-section");
+  const d  = document.createElement("div");
+  d.className = "log-entry" + (important ? " important" : "");
+  d.textContent = msg;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+
+// ── Render ─────────────────────────────────────────────────────────────
+function render() {
+  renderMap();
+  renderPlayers();
+  renderPhase();
+  renderButtons();
+}
+
+function renderMap() {
+  const cp = S.currentPlayer;
+  const map = document.getElementById("map");
+  const existing = {};
+  [...map.querySelectorAll(".terr")].forEach(el => existing[el.dataset.id] = el);
+
+  S.territories.forEach(t => {
+    const owner  = t.owner >= 0 ? PLAYERS[t.owner] : null;
+    const isSel  = t.id === S.selected;
+    let canAtk   = false, canFort = false;
+    if (S.phase === "attack" && S.selected >= 0 && !isSel) {
+      const src = S.territories[S.selected];
+      canAtk = t.owner !== cp && src.adj.includes(t.id);
+    }
+    if (S.phase === "fortify" && S.selected >= 0 && !isSel) {
+      const src = S.territories[S.selected];
+      canFort = t.owner === cp && src.adj.includes(t.id);
+    }
+
+    let el = existing[t.id];
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "terr";
+      el.dataset.id = t.id;
+      el.innerHTML = `<div class="terr-name">${t.name}</div><div class="terr-troops">${t.troops}</div><div class="terr-cont">${t.cont}</div>`;
+      el.onclick = () => clickTerr(t.id);
+      map.appendChild(el);
+    } else {
+      el.querySelector(".terr-troops").textContent = t.troops;
+    }
+
+    el.style.background   = owner ? owner.light : "rgba(255,255,255,0.04)";
+    el.style.borderColor  = owner ? owner.color : "rgba(139,105,20,0.4)";
+    el.style.color        = owner ? "#f5f0e8" : "rgba(245,240,232,0.5)";
+    el.classList.toggle("selected",    isSel);
+    el.classList.toggle("can-attack",  canAtk);
+    el.classList.toggle("can-fortify", canFort);
+  });
+}
+
+function renderPlayers() {
+  const wrap = document.getElementById("players-wrap");
+  wrap.innerHTML = "";
+  PLAYERS.forEach(p => {
+    const alive   = own(p.id).length > 0;
+    const troops  = own(p.id).reduce((s,t) => s+t.troops, 0);
+    const active  = p.id === S.currentPlayer;
+    const card    = document.createElement("div");
+    card.className = "player-card" + (active ? " active" : "") + (!alive ? " eliminated" : "");
+    card.innerHTML = `
+      ${active ? '<div class="active-crown">♛</div>' : ""}
+      <div class="pc-name">
+        <span class="pc-dot" style="background:${p.dot}"></span>
+        ${p.name}
+      </div>
+      <div class="pc-stat"><b>${own(p.id).length}</b> gebieden</div>
+      <div class="pc-stat"><b>${troops}</b> troepen</div>
+      ${!alive ? '<div class="pc-stat" style="color:#e74c3c">★ uitgeschakeld</div>' : ""}
+    `;
+    wrap.appendChild(card);
+  });
+}
+
+function renderPhase() {
+  const phases = {
+    place:   ["TROEPEN PLAATSEN", "Klik je eigen gebieden om troepen te plaatsen."],
+    attack:  ["AANVALLEN", "Selecteer een eigen gebied (≥2 troepen), dan een vijandelijk aangrenzend gebied."],
+    fortify: ["VERSTERKEN", "Verplaats troepen tussen aangrenzende eigen gebieden, of beëindig je beurt."],
+  };
+  document.getElementById("phase-title").textContent = phases[S.phase][0];
+  document.getElementById("phase-hint").textContent  = phases[S.phase][1];
+  const tl = document.getElementById("troops-left");
+  const ll = document.getElementById("troops-lbl");
+  if (S.phase === "place") {
+    tl.style.display = "block"; ll.style.display = "block";
+    tl.textContent = S.troopsLeft;
+  } else {
+    tl.style.display = "none"; ll.style.display = "none";
+  }
+}
+
+function renderButtons() {
+  const btnAuto  = document.getElementById("btn-auto");
+  const btnSkip  = document.getElementById("btn-skip");
+  const btnEnd   = document.getElementById("btn-end");
+  btnAuto.style.display = S.phase === "place"   ? "" : "none";
+  btnSkip.style.display = S.phase === "attack"  ? "" : "none";
+  btnEnd.style.display  = S.phase === "fortify" ? "" : "none";
+  btnAuto.disabled = S.troopsLeft <= 0;
+}
+
+function buildContLegend() {
+  const el = document.getElementById("cont-legend");
+  for (const [cn, cd] of Object.entries(CONTINENTS)) {
+    const cnt = TERR_DATA.filter(t => t.cont === cn).length;
+    el.innerHTML += `<div class="cont-item">${cn} (${cnt}) <b>+${cd.bonus}</b></div>`;
+  }
+}
+
+// ── Button events ──────────────────────────────────────────────────────
+document.getElementById("btn-auto").onclick = () => {
+  const cp = S.currentPlayer;
+  while (S.troopsLeft > 0) {
+    const t = own(cp).reduce((a,b) => a.troops > b.troops ? a : b);
+    animTroop(t.id, "add");
+    t.troops++;
+    S.troopsLeft--;
+  }
+  S.phase = "attack"; S.selected = -1;
+  log(`${PLAYERS[cp].name} plaatste troepen automatisch.`);
+  render();
+};
+document.getElementById("btn-skip").onclick = () => {
+  S.phase = "fortify"; S.selected = -1;
+  log(`${PLAYERS[S.currentPlayer].name} stopt met aanvallen.`);
+  render();
+};
+document.getElementById("btn-end").onclick = () => {
+  S.selected = -1;
+  document.getElementById("fortify-row").style.display = "none";
+  endTurn();
+};
+document.getElementById("btn-restart").onclick = () => location.reload();
+document.getElementById("fortify-slider").oninput = function() {
+  document.getElementById("fortify-val").textContent = this.value;
+};
+
+// ── Start ──────────────────────────────────────────────────────────────
+initGame();
+</script>
+</body>
+</html>
